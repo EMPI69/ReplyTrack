@@ -4,6 +4,14 @@
 
 # Data exports (LinkedIn data, Google Sheet downloads)
 *.csv
+# "Import sent history" file from the old extension — real people's LinkedIn profiles
+outreach-sent-history*.json
+# A local copy of Code.gs with your real SECRET_KEY in it
+*.local.gs
+
+# Editor settings
+.vscode/
+.idea/
 
 # Dependencies
 node_modules/

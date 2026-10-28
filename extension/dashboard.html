@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>ReplyTrack</title>
+		<link rel="icon" href="icons/icon48.png" />
+		<link rel="stylesheet" href="dashboard.css" />
+		<script src="dash/theme.js"></script>
+	</head>
+	<body>
+		<header class="top">
+			<div class="wrap top-in">
+				<div class="brand">
+					<svg width="32" height="32" viewBox="0 0 128 128" aria-hidden="true">
+						<rect width="128" height="128" rx="28" fill="#0b0b0c" />
+						<rect x="1.5" y="1.5" width="125" height="125" rx="26.5" fill="none" stroke="#4a4a50" stroke-width="3" />
+						<path d="M88 88 V76 C88 63.8 78.2 54 66 54 H40" fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" />
+						<path d="M56 38 L40 54 L56 70" fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" />
+					</svg>
+					<div>
+						<div class="brand-name">ReplyTrack</div>
+						<div class="label">LinkedIn outreach</div>
+					</div>
+				</div>
+				<nav class="tabs" id="tabs">
+					<button data-tab="overview">Overview</button>
+					<button data-tab="outreach">Outreach</button>
+					<button data-tab="replies">Replies</button>
+					<button data-tab="tosend">To send <span class="count hidden" id="tabCount"></span></button>
+					<button data-tab="settings">Settings</button>
+				</nav>
+				<div class="top-right">
+					<span class="status" id="status"><span class="dot"></span><span id="statusText">Paused</span></span>
+					<button class="btn sm secondary" id="pause"></button>
+					<button class="icon-btn" id="theme" title="Light theme"></button>
+					<div class="avatar" id="avatar">RT</div>
+				</div>
+			</div>
+		</header>
+
+		<main class="wrap">
+			<div id="banner" class="banner hidden"></div>
+
+			<!-- ================= Overview ================= -->
+			<section id="page-overview" class="page">
+				<div class="hello">
+					<div class="label">Welcome back,</div>
+					<h1 id="memberName">—</h1>
+					<p class="muted" id="memberTab"></p>
+				</div>
+				<div class="stats">
+					<div class="card stat" data-accent="blue"><div class="label">Sent today</div><div class="num" id="ovSent">0</div><div class="cap" id="ovSentCap"></div></div>
+					<div class="card stat" data-accent="amber"><div class="label">Accepted</div><div class="num" id="ovAccepted">0</div><div class="cap">this week</div></div>
+					<div class="card stat" data-accent="purple"><div class="label">Replies</div><div class="num" id="ovReplies">0</div><div class="cap">captured today</div></div>
+					<div class="card stat" data-accent="green"><div class="label">To send</div><div class="num" id="ovToSend">0</div><div class="cap">waiting for you</div></div>
+				</div>
+				<div class="card">
+					<div class="card-head"><h2>Recent activity</h2><span class="label" id="activityCount"></span></div>
+					<div id="activity"></div>
+				</div>
+				<div class="section-title"><h2>How it works</h2></div>
+				<div class="steps">
+					<div class="card step" data-accent="blue"><div class="n">01</div><h3>Send request</h3><p>Waiting rows of your sheet get a connection request with their Personalized Message, then “Sent”.</p></div>
+					<div class="card step" data-accent="amber"><div class="n">02</div><h3>Accepted</h3><p>Twice a day, people who accepted get “Accepted but not replied” in Response / Notes.</p></div>
+					<div class="card step" data-accent="purple"><div class="n">03</div><h3>Reply captured</h3><p>Every 20 minutes their LinkedIn replies are copied into Response / Notes.</p></div>
+					<div class="card step" data-accent="green"><div class="n">04</div><h3>Admin reply sent</h3><p>Your manager's reply waits in To send until you press Send — then it's checked on LinkedIn.</p></div>
+				</div>
+			</section>
+
+			<!-- ================= Outreach ================= -->
+			<section id="page-outreach" class="page">
+				<div class="page-head">
+					<div>
+						<div class="label">Outreach</div>
+						<h1>Connection requests</h1>
+						<p id="sheetLine"></p>
+					</div>
+					<div class="actions">
+						<button class="btn secondary" id="dry" title="Looks every waiting profile up and says what would happen — sends nothing, writes nothing">Dry run</button>
+						<button class="btn primary" id="orMain">Start</button>
+					</div>
+				</div>
+				<div class="card notice hidden" id="continueBox"><div id="continueText"></div></div>
+				<div class="stats">
+					<div class="card stat" data-accent="blue"><div class="label">Sent today</div><div class="num" id="orToday">0</div><div class="cap" id="orTodayCap"></div></div>
+					<div class="card stat" data-accent="amber"><div class="label">Remaining</div><div class="num" id="orLeft">0</div><div class="cap">waiting for a request</div></div>
+					<div class="card stat" data-accent="purple"><div class="label">Skipped</div><div class="num" id="orSkipped">0</div><div class="cap">reasons in the table</div></div>
+					<div class="card stat" data-accent="green"><div class="label">Failed</div><div class="num" id="orFailed">0</div><div class="cap">retried up to 3 times</div></div>
+				</div>
+				<div class="card">
+					<div class="card-head"><h2 id="orStateTitle">Idle</h2><span class="label" id="orCount"></span></div>
+					<div class="progress"><div id="bar"></div></div>
+					<p id="orState" class="muted"></p>
+					<p id="eta" style="margin-top: 6px; font-weight: 600"></p>
+					<p id="bgTip" class="muted" style="margin-top: 6px; font-size: 13px">
+						Works in the background, from a LinkedIn tab in a minimized window. Leave Chrome open and the computer awake; this page can be closed.
+					</p>
+				</div>
+				<div class="cols" style="margin-top: 16px">
+					<div class="card">
+						<div class="card-head"><h2>Message preview</h2><button class="link" data-goto="settings">Change the note</button></div>
+						<div id="noteMode" class="muted"></div>
+						<div class="preview" id="preview"></div>
+						<div class="warnings" id="warnings"></div>
+					</div>
+					<div class="stack">
+						<div class="card">
+							<div class="card-head"><h2>Pace &amp; limits</h2><button class="link" data-goto="settings">Change</button></div>
+							<div class="label">With these settings</div>
+							<div class="big-rate" id="rate"></div>
+							<div class="kv" id="pace"></div>
+						</div>
+						<div class="card">
+							<div class="card-head"><h2>Who accepted</h2><button class="btn sm secondary" id="acNow">Check now</button></div>
+							<p class="muted" style="font-size: 13px">
+								Twice a day (about 10 AM and 4 PM, or the next time Chrome is open), “Sent” rows from the last 30 days with an empty Response / Notes are
+								compared with your recently added connections.
+							</p>
+							<p id="acState" style="margin-top: 10px; font-size: 13px"></p>
+						</div>
+					</div>
+				</div>
+				<div class="card" style="margin-top: 16px">
+					<div class="card-head">
+						<h2>Rows</h2>
+						<div class="actions">
+							<select id="filter">
+								<option value="">All</option>
+								<option value="pending">Waiting</option>
+								<option value="sent">Sent</option>
+								<option value="skipped">Skipped</option>
+								<option value="failed">Failed</option>
+							</select>
+							<button class="btn sm secondary" id="reload"></button>
+							<button class="btn sm secondary" id="export"></button>
+						</div>
+					</div>
+					<div id="detect" style="font-size: 13px; margin: -6px 0 12px"></div>
+					<div class="table-wrap" id="rowsWrap">
+						<table>
+							<thead>
+								<tr>
+									<th>Row</th>
+									<th>Profile</th>
+									<th>Status</th>
+									<th>Detail</th>
+									<th>When</th>
+								</tr>
+							</thead>
+							<tbody id="rows"></tbody>
+						</table>
+					</div>
+					<div id="rowsEmpty"></div>
+					<p class="muted" id="rowsMore" style="font-size: 13px"></p>
+				</div>
+				<details class="card">
+					<summary><h2>What happens to each row</h2></summary>
+					<table class="rules">
+						<tr><td>Outreach Status empty or “Not Started”, with a LinkedIn Profile and a Personalized Message, not connected yet</td><td class="send">Connection request → the sheet gets “Sent” and the Sent Date</td></tr>
+						<tr><td>Any other Outreach Status (Sent, Drafted, Replied, Meeting Booked, Follow-up, Not Interested, Bounced) — or another row for the same person has one</td><td class="skip">Never touched</td></tr>
+						<tr><td>Already a connection</td><td class="skip">No request possible — listed in To send: send the Personalized Message as a chat when you choose (then “Sent” + today's Sent Date)</td></tr>
+						<tr><td>Request already pending on LinkedIn</td><td class="skip">Not sent — the sheet gets “Sent”, Sent Date left empty</td></tr>
+						<tr><td>They already sent you a request</td><td class="skip">Skipped — accept it on LinkedIn</td></tr>
+						<tr><td>Already sent a request by this extension (ever — imported history too)</td><td class="skip">Not sent again, without opening the profile — the sheet gets “Sent” and the original Sent Date</td></tr>
+						<tr><td>The note is over 300 characters, or has a {placeholder} with nothing to fill it</td><td class="skip">Skipped — waits again once the row changes</td></tr>
+					</table>
+					<p class="muted" style="margin-top: 12px; font-size: 13px">
+						Other skipped rows and failed rows keep their Outreach Status — the reason shows here only. Rows go in sheet order; every result is saved as it
+						happens, so Stop, a sign-out or closing the browser never loses your place. The first 3 requests of every run (and about 1 in 20 after) are checked
+						on LinkedIn; if one isn't pending, the run stops.
+					</p>
+				</details>
+				<details class="card">
+					<summary><h2>Log</h2></summary>
+					<div class="actions" style="margin-bottom: 12px">
+						<button class="btn sm secondary" id="copyLog">Copy</button>
+						<button class="btn sm secondary" id="clearLog">Clear</button>
+					</div>
+					<div class="log" id="log"></div>
+				</details>
+			</section>
+
+			<!-- ================= Replies ================= -->
+			<section id="page-replies" class="page">
+				<div class="page-head">
+					<div>
+						<div class="label">Replies</div>
+						<h1>Replies</h1>
+						<p>A pinned LinkedIn Messaging tab copies new replies into Response / Notes every 20 minutes — and 30 seconds after the computer wakes up.</p>
+					</div>
+					<div class="actions">
+						<button class="btn secondary" id="syncNow"></button>
+						<button class="btn primary" id="rsMain">Start sync</button>
+					</div>
+				</div>
+				<div class="stats three">
+					<div class="card stat" data-accent="purple"><div class="label">Status</div><div class="num word" id="rsLine">—</div><div class="cap" id="rsLineCap"></div></div>
+					<div class="card stat" data-accent="blue"><div class="label">Last sync</div><div class="num word" id="rsLast">never</div><div class="cap" id="rsLastCap"></div></div>
+					<div class="card stat" data-accent="green"><div class="label">Replies today</div><div class="num" id="rsToday">0</div><div class="cap">captured today</div></div>
+				</div>
+				<div class="card" id="rsSummaryCard"><div id="rsSummary"></div></div>
+				<div class="card">
+					<div class="card-head"><h2>Latest replies</h2><span class="label" id="rsRecentCount"></span></div>
+					<div id="rsRecent"></div>
+				</div>
+				<details class="card">
+					<summary><h2>Details</h2></summary>
+					<div class="log" id="rsDetails"></div>
+				</details>
+			</section>
+
+			<!-- ================= To send ================= -->
+			<section id="page-tosend" class="page">
+				<div class="page-head">
+					<div>
+						<div class="label">To send</div>
+						<h1>Messages to send</h1>
+						<p>Nothing is sent until you press Send — one at a time, never twice, and checked in the LinkedIn conversation afterwards.</p>
+					</div>
+					<div class="actions">
+						<span class="label" id="adRead"></span>
+						<button class="btn secondary" id="adRefresh"></button>
+					</div>
+				</div>
+				<div class="card notice hidden" id="adPaused">Paused — press “Start again” to send.</div>
+				<div class="section-title" style="margin-top: 0"><h2>Admin replies</h2><span class="label" id="adCount"></span></div>
+				<div class="items" id="list"></div>
+				<div class="card hidden" id="adEmpty"></div>
+				<div class="section-title"><h2>Already connected</h2><span class="label">Send your message as a chat</span></div>
+				<div class="items" id="chatList"></div>
+				<div class="card hidden" id="chatEmpty"></div>
+				<details class="card" style="margin-top: 36px">
+					<summary><h2>Details</h2></summary>
+					<div class="log" id="adDetails"></div>
+				</details>
+			</section>
+
+			<!-- ================= Settings ================= -->
+			<section id="page-settings" class="page">
+				<div class="page-head">
+					<div>
+						<div class="label">Settings</div>
+						<h1>Settings</h1>
+					</div>
+				</div>
+				<div class="settings">
+					<div class="card" id="connCard">
+						<h2>Connection</h2>
+						<p>Your own sheet's web app, from Code.gs (README, Part 1).</p>
+						<div class="field">
+							<div class="field-head"><label class="label" for="tabName">Tab name</label><span class="hint">Exactly as the tab at the bottom of your sheet</span></div>
+							<input id="tabName" type="text" autocomplete="off" spellcheck="false" placeholder="MY LEADS" />
+						</div>
+						<div class="field">
+							<div class="field-head"><label class="label" for="scriptUrl">Web app URL</label><span class="hint">Starts with https://script.google.com/, ends with /exec</span></div>
+							<input id="scriptUrl" type="url" autocomplete="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec" />
+						</div>
+						<div class="field">
+							<div class="field-head"><label class="label" for="secretKey">Secret key</label><span class="hint">Same as <code>SECRET_KEY</code> in your Code.gs</span></div>
+							<div class="inline">
+								<input id="secretKey" type="password" autocomplete="off" spellcheck="false" />
+								<button class="btn secondary" id="showKey" type="button">Show</button>
+							</div>
+						</div>
+						<label class="check">
+							<input id="useGoogleLogin" type="checkbox" />
+							<span
+								>Send my Google login with each request
+								<span class="hint" style="display: block; margin: 2px 0 0">Only for a script deployed to “Anyone within your organisation”.</span></span
+							>
+						</label>
+						<div class="conn-actions">
+							<div class="actions">
+								<button class="btn primary" id="save">Save</button>
+								<button class="btn secondary" id="test">Test connection</button>
+							</div>
+							<div id="msg" class="msg"></div>
+						</div>
+					</div>
+
+					<div class="card">
+						<h2>Outreach</h2>
+						<p>A row only gets a request when both LinkedIn Profile and Personalized Message are filled. This decides what's sent with it.</p>
+						<div class="field">
+							<span class="label">Note</span>
+							<label class="choice"><input type="radio" name="noteMode" value="column" />Each row's <b>Personalized Message</b></label>
+							<label class="choice"
+								><input type="radio" name="noteMode" value="typed" /><b>One note for everyone</b>
+								<textarea id="noteText" rows="4" placeholder="Hi {firstName}, …"></textarea>
+								<div class="hint" id="typedStatus"></div
+							></label>
+							<label class="choice"><input type="radio" name="noteMode" value="none" /><b>No note</b> — send the request without one</label>
+							<div class="hint" style="margin-top: 10px">
+								Placeholders: <code>{Name}</code> <code>{Company Name}</code> — any column — and <code>{firstName}</code> <code>{headline}</code> from the profile. A
+								placeholder with nothing to fill it is never sent: the row is skipped. Up to 300 characters.
+							</div>
+						</div>
+						<div class="field">
+							<span class="label">Pace &amp; limits</span>
+							<div class="pace">
+								<span>Wait on each profile before sending</span>
+								<span><input type="number" id="readMin" min="1" step="1" /> – <input type="number" id="readMax" min="1" step="1" /><span class="u">s</span></span>
+								<span>Pause before the next profile<small>Skipped rows move on after 3–6 s</small></span>
+								<span><input type="number" id="pauseMin" min="1" step="1" /> – <input type="number" id="pauseMax" min="1" step="1" /><span class="u">s</span></span>
+								<span>Take a 1–3 minute break every<small>0 = no breaks</small></span>
+								<span><input type="number" id="breakEvery" min="0" max="500" /><span class="u">requests</span></span>
+								<span>Auto-stop after<small>0 = off — Continue goes on</small></span>
+								<span><input type="number" id="dailyCap" min="0" max="5000" /><span class="u">a day</span></span>
+							</div>
+							<div class="big-rate" id="setRate"></div>
+							<div class="hint">Saved as you type. Too little delay and too many requests can lead to restrictions on your LinkedIn account.</div>
+						</div>
+					</div>
+
+					<div class="card wide">
+						<h2>Data</h2>
+						<p>Kept in this Chrome profile only.</p>
+						<div class="data-grid">
+						<div class="field">
+							<span class="label">Reply sync</span>
+							<div class="actions" style="margin-top: 4px"><button class="btn secondary" id="reset">Reset sync history</button></div>
+							<div class="hint">The next sync re-checks your 50 most recent conversations. Nothing already in the sheet is duplicated.</div>
+						</div>
+						<div class="field">
+							<span class="label">Import sent history</span>
+							<p class="muted" style="font-size: 13px">
+								From the old “LinkedIn Automated Reachout” extension, so nobody it already sent a request to gets a second one. Do this once, before your first
+								run.
+							</p>
+							<details class="how">
+								<summary>How to get the file from the old extension</summary>
+								<ol>
+									<li>Click the old extension's icon → <b>Upload CSV</b> (this opens its page).</li>
+									<li>Press <b>F12</b> (Mac: Cmd+Option+I) → <b>Console</b>, paste this line and press Enter. It downloads <code>outreach-sent-history.json</code>:</li>
+								</ol>
+								<pre class="code">chrome.storage.local.get(null, d => { const h = {}; for (const k in d) if (k.startsWith("h:")) h[k] = d[k]; const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(h)], { type: "application/json" })); a.download = "outreach-sent-history.json"; a.click(); console.log(Object.keys(h).length + " people"); });</pre>
+								<p class="hint">The old extension's <b>Export CSV</b> file works too (rows whose requestStatus is “Sent”).</p>
+							</details>
+							<div class="actions" style="margin-top: 14px">
+								<button class="btn secondary" id="importBtn">Choose file…</button>
+								<input type="file" id="importFile" accept=".json,.csv,application/json,text/csv" hidden />
+							</div>
+							<div id="importMsg" class="msg"></div>
+						</div>
+						</div>
+					</div>
+				</div>
+			</section>
+		</main>
+
+		<!-- Unsaved Connection settings (the Outreach settings save as you type) -->
+		<div class="savebar hidden" id="saveBar" role="status">
+			<span class="dot"></span>
+			<span id="saveBarText">You have unsaved changes</span>
+			<button class="btn sm secondary" id="discard">Discard</button>
+			<button class="btn sm primary" id="saveBarSave">Save</button>
+		</div>
+
+		<script src="shared.js"></script>
+		<script src="dash/core.js"></script>
+		<script src="dash/overview.js"></script>
+		<script src="dash/outreach.js"></script>
+		<script src="dash/replies.js"></script>
+		<script src="dash/tosend.js"></script>
+		<script src="dash/settings.js"></script>
+	</body>
+</html>

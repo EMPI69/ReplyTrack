@@ -2,6 +2,8 @@
 // Runs once per page load. In the pinned sync tab only, it walks the
 // conversation list newest-first, opens each conversation, collects the
 // messages the OTHER person sent, and hands them to background.js.
+// In the extension's own minimized LinkedIn tab it only answers "read this
+// conversation" (for an Admin Reply: already sent there? did it arrive?).
 (() => {
 	"use strict";
 
@@ -159,8 +161,14 @@
 	// Set when background.js says "Stop sync" was pressed. From then on every
 	// step (waits, opening a conversation, sending) ends the sync instead.
 	let stopRequested = false;
-	chrome.runtime.onMessage.addListener(msg => {
-		if (msg && msg.type === "stopSync") stopRequested = true;
+	chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+		if (!msg) return;
+		if (msg.type === "stopSync") stopRequested = true;
+		if (msg.type === "RT_PING") sendResponse({ ok: true, path: location.pathname, login: isLoginPage() });
+		if (msg.type === "RT_READ_THREAD") {
+			readForCheck().then(sendResponse, e => sendResponse({ ok: false, error: e.message || String(e) }));
+			return true;
+		}
 	});
 
 	// ---- DOM helpers ---------------------------------------------------------
@@ -502,6 +510,7 @@
 			threadId: (location.pathname.match(P.threadId) || [])[1] || "",
 			listFound: !!list,
 			messages: [],
+			mine: [], // messages YOU sent — never "their reply"; used to find your last Admin Reply
 			otherHrefs: new Map(), // personKey -> href, for senders of "their" messages
 			isGroup: P.groupSubtitle.test(header.subtitle),
 			isSponsored: !!(qs(list, S.threadSponsoredMarker) || (header.bar !== header.root && qs(header.bar, S.threadSponsoredMarker))),
@@ -519,6 +528,7 @@
 		const capturedAt = Date.now();
 		let day = null; // from the latest date divider
 		let time = null; // from the latest sender header
+		let seq = 0; // position in the conversation, oldest first (theirs and yours)
 
 		for (const ev of qsa(list, S.messageEvent)) {
 			const heading = matchesAny(ev, S.dateHeading) ? ev : qs(ev, S.dateHeading);
@@ -543,14 +553,18 @@
 				if (!body) continue;
 				const text = messageText(body);
 				if (!text) continue;
+				const i = seq++;
 				const fromOther =
 					matchesAny(item, S.otherPersonMessage) ||
 					!!qs(item, S.otherPersonMessage) ||
 					!!(partnerKey && sender.href && personKey(sender.href) === partnerKey) ||
 					!!(partnerName && sender.name && namesMatch(sender.name, header.name));
-				if (!fromOther) continue;
+				if (!fromOther) {
+					t.mine.push({ text, i });
+					continue;
+				}
 				const sentAt = sentAtOf(day, time, capturedAt);
-				t.messages.push({ text, sentAt: sentAt || capturedAt, timeFromLinkedIn: !!sentAt });
+				t.messages.push({ text, sentAt: sentAt || capturedAt, timeFromLinkedIn: !!sentAt, i });
 				if (sender.href) t.otherHrefs.set(personKey(sender.href), sender.href);
 			}
 		}
@@ -649,9 +663,11 @@
 		const r = await send({
 			type: "postConversation",
 			conversationId: t.threadId || info.threadId || `p:${personKey(profileUrl)}`,
+			threadId: t.threadId || info.threadId || "",
 			profileUrl,
 			name: t.name || info.name,
 			messages: t.messages,
+			mine: t.mine,
 		});
 		if (!r) return { outcome: "error", why: "the background script did not answer" };
 		if (r.fatal) return { outcome: "fatal", why: r.status };
@@ -782,6 +798,38 @@
 		const summary = `Checked ${stats.opened} conversation(s) · sent ${stats.sent} new message(s) · ${stats.nothing} with nothing new · ${stats.skipped} skipped · ${stats.failed} failed`;
 		log(`Sync finished. ${summary}${error ? ` · ERROR: ${error}` : ""}`);
 		await send({ type: "syncFinished", sent: stats.sent, failed: stats.failed, summary, error, nextLastSync }).catch(() => {});
+	}
+
+	// ---- Admin Reply check (the extension's own minimized tab) ---------------
+	// background.js opened one conversation here. Wait for it, then report who it's
+	// with and the messages YOU sent in it. Reads only: nothing is clicked or typed.
+	// Waits use this page's own timers (not "sleep" via the background, which is
+	// refused while the reply sync is stopped).
+	async function readForCheck() {
+		const pause = ms => new Promise(res => setTimeout(res, ms));
+		const loaded = () => {
+			const list = qs(document, S.messageList);
+			return !!list && qsa(list, S.messageEvent).length > 0;
+		};
+		const end = Date.now() + CONFIG.LIST_TIMEOUT_MS;
+		while (!loaded() && Date.now() < end) {
+			if (isLoginPage()) return { ok: false, loggedOut: true };
+			await pause(CONFIG.POLL_MS);
+		}
+		if (!loaded()) return { ok: false, error: "the conversation did not load" };
+		await pause(CONFIG.SETTLE_MS * 2); // late messages
+		const t = readThread();
+		log(`Read conversation ${t.threadId || "?"} with "${t.name}" for an Admin Reply check: ${t.mine.length} message(s) from you, ${t.messages.length} from them.`);
+		return {
+			ok: true,
+			threadId: t.threadId,
+			profileHref: t.profileHref,
+			name: t.name,
+			otherHrefs: [...t.otherHrefs.values()],
+			isGroup: t.isGroup,
+			mine: t.mine.map(m => m.text),
+			theirs: t.messages.length,
+		};
 	}
 
 	async function main() {

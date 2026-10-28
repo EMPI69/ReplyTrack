@@ -1,211 +1,322 @@
 # ReplyTrack
 
-When someone replies to you on LinkedIn, their reply is copied into the **Reply** column of their row in **your tab** of the team Google Sheet. It runs by itself in Chrome. Nobody has to click anything.
+A Chrome add-on that sends your LinkedIn connection requests from your Google Sheet and keeps the sheet up to date for you.
 
-```
-reply-sync/
-├── README.md              ← this file
-├── apps-script/
-│   └── Code.gs            ← goes into the Google Sheet (team lead does this once)
-└── extension/             ← the Chrome extension (every team member loads this)
-    ├── manifest.json
-    ├── background.js      ← keeps the LinkedIn tab running, talks to the Sheet
-    ├── content.js         ← reads your LinkedIn messages (CONFIG at the top)
-    ├── popup.html / popup.js
-    ├── options.html / options.js
-    └── icons/ icon16.png  icon48.png  icon128.png
-```
+## Contents
 
-**How it works:** the extension keeps one **pinned** LinkedIn Messaging tab open and reloads it every 20 minutes. It also reloads it 30 seconds after the computer wakes up or you come back to it. Each time the tab loads, the extension goes through your newest conversations at a human pace (2–5 seconds between each). It picks out the messages the *other person* sent, and when they sent them, and sends those to the Google Sheet. The Sheet finds that person's row by their LinkedIn profile link and fills in the Reply column like this:
-
-```
-[27 Oct 2026, 11:42 PM] Thanks for reaching out!
-
-[28 Oct 2026, 9:15 AM] Tuesday works for a call.
-```
-
-Each message gets the time the person sent it on LinkedIn, shown in the spreadsheet's time zone. Messages are listed oldest first, with a blank line between them, and the same message is never added twice. If the internet is down, the extension tries again every minute until it's back.
-
-**The sheet stays clean:** the only thing ever written is reply text in the Reply column. Errors and statuses only appear in the extension's popup. If anything goes wrong, the sheet isn't touched.
+- [What ReplyTrack does](#what-replytrack-does)
+- [Before you start](#before-you-start)
+- [Part 1 — Set up your sheet (once)](#part-1--set-up-your-sheet-once)
+- [Part 2 — Install the extension (once)](#part-2--install-the-extension-once)
+- [Part 3 — Connect it](#part-3--connect-it)
+- [Part 4 — Daily use](#part-4--daily-use)
+- [Part 5 — Make it start by itself](#part-5--make-it-start-by-itself)
+- [Something's not working?](#somethings-not-working)
+- [Updating to a new version](#updating-to-a-new-version)
 
 ---
 
-## Part 1: Set up the Google Sheet (team lead, once)
+## What ReplyTrack does
 
-1. Open the team Google Sheet. Check that **row 1** of every person's tab has the same headers, for example `Profile URL`, `Note`, `Reply`.
-   Also check **File → Settings → Time zone**. Reply times are written in this time zone, so set it to your team's time zone.
-2. Click **Extensions → Apps Script**. A code editor opens in a new tab.
-3. Delete everything in the editor. Open `apps-script/Code.gs` from this folder, copy all of it, and paste it in.
-4. Near the top, change the two header names to match your sheet **exactly** (upper/lower case doesn't matter):
-   ```js
-   var PROFILE_HEADER = 'Profile URL';
-   var REPLY_HEADER = 'Reply';
-   ```
-5. Click the 💾 **Save** icon.
-6. **Check your tabs:** in the toolbar dropdown next to "Debug", choose **testSetup** and click **▶ Run**.
-   - Google will ask for permission. Click **Review permissions**, choose your account, then **Advanced → Go to (project name) (unsafe)** → **Allow**. ("Unsafe" just means you wrote the script yourself rather than downloading it from Google.)
-   - The **Execution log** at the bottom should list every tab with `found` for both columns. If it says `MISSING`, fix the header in the sheet or the name in step 4.
-7. **Publish it as a web app:** click **Deploy → New deployment**.
-   - Click the ⚙️ gear next to "Select type" → **Web app**.
-   - Description: `ReplyTrack`
-   - **Execute as: Me**
-   - **Who has access: Anyone**
-   - Click **Deploy** (approve permissions again if asked).
-8. Copy the **Web app URL**. It looks like `https://script.google.com/macros/s/AKfy…/exec`. Send this URL to every team member.
-9. (Optional check) Paste the URL into a browser. It should say `ok — ReplyTrack web app is running`.
+- It sends LinkedIn connection requests to the people in your sheet, with each person's Personalized Message, and marks them **Sent**.
+- It notices who accepted, and copies their replies into your sheet by itself.
+- It lets you send your manager's reply (the **Admin Reply**) from one dashboard — only when you press **Send**.
+- Everything happens in your own Chrome, at a slow, human pace.
 
-> **Changing the script later:** use **Deploy → Manage deployments → ✏️ (edit) → Version: New version → Deploy**. This keeps the same URL. Don't use "New deployment" for updates, because that creates a new URL and everyone would have to change their settings.
->
-> **"Anyone" isn't in the list?** Some company Google accounts block it. Pick **"Anyone within (your company)"** instead. Each team member then ticks **"Send my Google login with each request"** in the extension settings and must be signed in to Chrome with their company Google account.
+![The ReplyTrack dashboard: Overview tab with today's numbers and recent activity](docs/images/00-overview.png)
 
 ---
 
-## Part 2: Install the extension (each team member, once)
+## Before you start
 
-1. Get the `reply-sync` folder (your team lead can zip and share it). Put it somewhere it will **stay**, e.g. `Documents\reply-sync`. Chrome loads the extension from this folder every time, so don't delete or move it.
-2. Open Chrome and type `chrome://extensions` in the address bar.
-3. Turn on **Developer mode** (switch at the top right).
-4. Click **Load unpacked** and select the **`extension`** folder inside `reply-sync` (the folder that contains `manifest.json`).
-5. Click the 🧩 puzzle icon in Chrome's toolbar and **pin** "ReplyTrack" so its blue **R** icon is always visible.
-6. A **Settings** page opens automatically. (To open it later, click the R icon → **Settings**.)
-   - **Your tab name:** your tab's name in the Google Sheet, spelled exactly the same, e.g. `John`.
-   - **Apps Script web app URL:** the URL from your team lead.
-   - Click **Save**. You should see **"Saved and connected."** If you see an error, read it: it tells you what's wrong (for example, the tab name is misspelled).
-7. Make sure you're **signed in to LinkedIn** in this Chrome.
-8. A small **pinned LinkedIn tab** appears at the far left of your tabs. **Leave it open.** That tab does the work. If you close it, it comes back within 20 minutes.
+You need:
 
-> Chrome may show a "Disable developer mode extensions" message when it starts. Click ✕ to close it. Don't click "Disable".
+- A computer with **Google Chrome**.
+- Your **LinkedIn** account, signed in in that Chrome.
+- **Your own Google Sheet** with the **MY LEADS** tab. Row 1 of that tab must have these column names: **LinkedIn Profile**, **Personalized Message**, **Outreach Status**, **Sent Date**, **Response / Notes**, **Admin Reply**. (Your team's sheet already has them.)
+- The link to the **ReplyTrack page on GitHub** — your team lead will send it. (GitHub is a website where the ReplyTrack files are shared.)
+- About **15 minutes**.
 
 ---
 
-## Updating from version 1.0
+## Part 1 — Set up your sheet (once)
 
-Only needed if you installed the first version, where replies were separated by `---` and had no times. Doing the steps in either order is safe, but the Sheet step is best done first.
+Here you add a small program to your Google Sheet. Google calls it **Apps Script**. ReplyTrack uses it to read and write your sheet.
 
-**Team lead: update the Sheet script**
-1. Open the Sheet → **Extensions → Apps Script**.
-2. Replace all the code with the new `apps-script/Code.gs`. Set `PROFILE_HEADER` and `REPLY_HEADER` again if you changed them before.
-3. Click 💾 **Save**.
-4. Click **Deploy → Manage deployments → ✏️ (edit)**. Under **Version**, choose **New version**, then click **Deploy**. The URL stays the same, so team members don't need to change anything.
-5. Check **File → Settings → Time zone** (see Part 1, step 1).
+1. Open your Google Sheet.
+2. Click **Extensions → Apps Script**. A new tab opens with a code editor.
+   ![TODO screenshot: Google Sheets with the Extensions menu open and "Apps Script" highlighted](docs/images/TODO-extensions-apps-script.png)
+   If Google says *"Sorry, unable to open the file at this time"*, see [Google says "unable to open the file"](#google-says-sorry-unable-to-open-the-file-at-this-time).
+3. Click inside the code, press **Ctrl+A** (Mac: **Cmd+A**), then press **Delete**. The editor is now empty.
+4. In another tab, open the ReplyTrack page on GitHub, click the **apps-script** folder, then click **Code.gs**.
+5. Click the **Copy raw file** button (two small squares, top right of the code).
+   ![TODO screenshot: Code.gs on GitHub with the "Copy raw file" button highlighted](docs/images/TODO-github-copy-code.png)
+6. Go back to the Apps Script tab. Click inside the editor and press **Ctrl+V** (Mac: **Cmd+V**).
+7. Make up your **secret key**: a password of 16 or more letters and numbers — for example from a password generator. Use only letters, numbers and dashes. Write it down somewhere safe; you'll need it again in Part 3.
+   (The secret key is like a password for your sheet: ReplyTrack sends it with every request, and your sheet ignores any request without it. Don't share it.)
+8. Near the top of the code, find this line:
+   `var SECRET_KEY = 'CHANGE-ME';`
+   Replace **CHANGE-ME** with your secret key. Keep the quote marks around it.
+   ![TODO screenshot: Apps Script editor with the SECRET_KEY line highlighted (use a made-up key)](docs/images/TODO-apps-script-secret-key.png)
+9. Click the **Save project** icon (💾) at the top of the editor.
+10. In the list next to **Debug** at the top, choose **testSetup**.
+11. Click **▶ Run**.
+12. Google asks for permission (the first time only). Click **Review permissions** and choose your Google account.
+13. Click **Advanced**, then **Go to … (unsafe)**, then **Allow**. If you see tick boxes, tick them all first. ("Unsafe" only means Google hasn't checked a script you added yourself.)
+    ![TODO screenshot: Google's "Google hasn't verified this app" screen with "Advanced" and "Go to … (unsafe)"](docs/images/TODO-authorize-unsafe.png)
+14. Look at the **Execution log** at the bottom. It should say **Secret key: set**, and the **MY LEADS** line should say **all columns found**. (Other tabs may say "not usable" — that's fine.)
+    ![TODO screenshot: the Execution log after running testSetup, showing "Secret key: set" and "Tab "MY LEADS": … all columns found"](docs/images/TODO-test-setup-log.png)
+    If MY LEADS says **missing column**, fix that column name in row 1 of your sheet, then run **testSetup** again.
+15. Click **Deploy → New deployment** (top right). (To **deploy** means to switch the script on so ReplyTrack can reach it.)
+16. Click the ⚙️ gear next to **Select type**, then click **Web app**.
+17. Set **Execute as** to **Me**.
+18. Set **Who has access** to **Anyone**. (This lets ReplyTrack reach your sheet. Your secret key keeps everyone else out.)
+    ![TODO screenshot: Deploy dialog with "Execute as: Me" and "Who has access: Anyone"](docs/images/TODO-deploy-dialog.png)
+    If **Anyone** isn't in the list (some company accounts), choose **Anyone within** your company instead, and remember to do Part 3, step 6.
+19. Click **Deploy**. If Google asks for permission again, allow it as in steps 12–13.
+20. Under **Web app**, click **Copy** to copy the URL. It ends in **/exec**. Paste it somewhere safe — you'll need it in Part 3.
+    ![TODO screenshot: "New deployment" result showing the Web app URL ending in /exec and the Copy button (blur the ID)](docs/images/TODO-web-app-url.png)
 
-**Each team member: update the extension**
-1. Replace the files in your `reply-sync` folder with the new ones (same place on your computer).
-2. Go to `chrome://extensions` and click the **↻ reload** icon on ReplyTrack. Your settings are kept.
-
-**Existing Reply cells:** text already in a cell is kept. The next time that person sends a new message, the cell is tidied up. The old messages, which have no time, stay at the top. The `---` lines are removed, and the new messages are added below with their times.
-
----
-
-## Part 3: Make Chrome open by itself when the computer starts
-
-**Windows**
-1. Press **Windows key + R**, type `shell:startup`, press Enter. A folder opens.
-2. Right-click Chrome on your desktop or in the Start menu → **Open file location** (if needed) → right-click **Google Chrome** → **Copy**.
-3. In the startup folder, right-click → **Paste shortcut**.
-4. In Chrome: **⋮ menu → Settings → System** → turn on **"Continue running background apps when Google Chrome is closed."**
-5. (Recommended) **Settings → On startup → "Continue where you left off"** so the pinned tab is restored.
-
-**Mac**
-1. Open **System Settings → General → Login Items**.
-2. Under **Open at Login**, click **+**, choose **Google Chrome** from Applications, and click **Open**.
-   (Or: right-click Chrome in the Dock → **Options → Open at Login**.)
-3. (Recommended) In Chrome: **Settings → On startup → "Continue where you left off."**
-
-> If you use several Chrome profiles, the extension must be installed in the profile where you're signed in to LinkedIn, and that profile must be the one that opens at startup.
-
----
-
-## Part 4: Keep the computer awake during work hours
-
-The computer must be **on and logged in**, with Chrome running. The **screen can turn off** and the computer **can be locked**. Both are fine. Only **sleep** stops syncing. When the computer wakes up again, the extension syncs within about 30 seconds, so nothing that arrived during sleep is missed.
-
-**Windows 11**
-1. **Settings → System → Power & battery → Screen, sleep, & hibernate timeouts.**
-2. Set **"When plugged in, put my device to sleep after"** to **Never**. The screen timeout can stay as it is.
-3. Laptops: keep it plugged in. Under **Lid & power button controls**, set **"When I close the lid" (plugged in)** to **Do nothing** if you close the lid.
-   *(For work hours only: Microsoft's free **PowerToys → Awake** can keep the PC awake until a set time.)*
-
-**Mac**
-1. **System Settings → Battery → Options** (on a desktop Mac: **System Settings → Energy**).
-2. Turn on **"Prevent automatic sleeping on power adapter when the display is off."**
-3. Laptops: keep it plugged in and the lid open (a closed lid sleeps unless an external monitor is attached).
-   *(Optional, to wake it every weekday morning: open **Terminal** and run `sudo pmset repeat wakeorpoweron MTWRF 08:45:00`.)*
+✅ **It worked if** the Execution log said *Secret key: set* and you have a web address that ends in **/exec**.
 
 ---
 
-## Part 5: Testing checklist
+## Part 2 — Install the extension (once)
 
-Do this once after setup, using a second LinkedIn account (a colleague's or a test account).
+An **extension** is a small add-on for Chrome. You'll load ReplyTrack from a folder on your computer.
 
-- [ ] In your tab, add a row with the **second account's** profile link in the Profile URL column (copy it from their profile page, e.g. `https://www.linkedin.com/in/their-name`). Leave Reply empty.
-- [ ] Click the R icon. It shows your tab name. Settings say **"Saved and connected."**
-- [ ] From the **second account**, send a message to **you**, e.g. "Test reply 1".
-- [ ] Click the R icon → **Sync now**. The status shows "Syncing…" and then a summary.
-- [ ] Within about a minute, the Reply cell in that row says `[27 Oct 2026, 11:42 AM] Test reply 1`, showing the date and time you sent it, not the time of the sync.
-- [ ] Send "Test reply 2" from the second account, then click **Sync now** again. The cell now has two timestamped lines, oldest first, with a blank line between them and no `---`.
-- [ ] Click **Sync now** once more without new messages. The cell doesn't change.
-- [ ] From the second account, send "Test reply 1" again (the same text). After a sync, it is **not** added a second time.
-- [ ] Check that **another team member's tab was not touched**, and that no other cell or column changed.
-- [ ] Sign out of LinkedIn and click **Sync now**. A notification says *"LinkedIn is logged out — please sign in…"*, and nothing is written to the sheet. Sign back in.
-- [ ] Turn off Wi-Fi and click **Sync now**. The popup says *"No internet connection — retrying automatically in 1 minute."* and nothing is written to the sheet. Turn Wi-Fi back on. Within about a minute, a sync runs by itself.
-- [ ] Put the computer to sleep. Meanwhile, send "Test reply 3" from the second account. Wake the computer. Within about a minute, the reply appears in the sheet with the time it was sent.
-- [ ] Restart the computer. Chrome opens by itself, and the pinned LinkedIn tab comes back.
+1. On the ReplyTrack page on GitHub, click the green **Code** button, then **Download ZIP**.
+   ![TODO screenshot: GitHub page with the green "Code" button open and "Download ZIP" highlighted](docs/images/TODO-github-download-zip.png)
+2. Open your **Downloads** folder. Right-click the ZIP file and choose **Extract All…**, then **Extract**. (Mac: double-click the ZIP file.)
+3. Move the new folder to a place where it can stay, for example **Documents**. Chrome loads ReplyTrack from this folder every time, so don't delete, move or rename it later.
+4. Open Chrome. Type `chrome://extensions` in the address bar and press **Enter**.
+5. Turn on **Developer mode** (the switch at the top right). (This lets Chrome load an add-on from a folder instead of the Chrome Web Store.)
+   ![TODO screenshot: chrome://extensions with "Developer mode" switched on and the "Load unpacked" button visible](docs/images/TODO-chrome-extensions-developer-mode.png)
+6. Click **Load unpacked**.
+7. Open the ReplyTrack folder, click the folder named **extension** inside it (it contains a file called *manifest.json*), then click **Select Folder**.
+   ![TODO screenshot: the folder picker with the "extension" folder selected](docs/images/TODO-load-unpacked-folder.png)
+8. Click the puzzle-piece icon 🧩 at the top right of Chrome, then click the pin 📌 next to **ReplyTrack**.
+   ![TODO screenshot: Chrome's puzzle-piece menu with the pin next to ReplyTrack](docs/images/TODO-pin-extension.png)
+9. Only if you used the old **LinkedIn Automated Reachout** or the old **ReplyTrack** extension: on `chrome://extensions`, switch them **off**. Don't click **Remove** — that would delete their history.
+
+✅ **It worked if** a dark square icon with a white arrow appears at the top right of Chrome, and the ReplyTrack dashboard opens by itself on the **Settings** tab.
+
+> When Chrome starts, it may show a message about developer-mode extensions. Close it with **✕** — don't click **Disable**.
 
 ---
 
-## Part 6: If it stops working
+## Part 3 — Connect it
 
-**1. Look at the popup.** Click the R icon. The status box shows the last error in plain words:
+1. Click the **ReplyTrack** icon. The dashboard opens.
+2. Click **Settings** at the top.
+3. In **Tab name**, type **MY LEADS** — exactly as your tab is named.
+4. In **Web app URL**, paste the address from Part 1 (it ends in /exec).
+5. In **Secret key**, paste your secret key — the same one you put in Code.gs.
+6. Only if you chose **Anyone within** your company in Part 1: tick **Send my Google login with each request**.
+7. Click **Save**. ReplyTrack saves your settings and tests the connection.
+8. Read the message under the buttons. It should be green and start with **Connected**. Lines that start with ⚠ need fixing — see [Test connection shows a problem](#test-connection-shows-a-problem).
+9. Only if you used the old **LinkedIn Automated Reachout** extension: scroll down to **Data → Import sent history** and follow the steps shown there, so nobody gets a second request.
 
-| Message | What to do |
+![Settings tab after Save: the Connection card with a green "Connected. Found the tab “MY LEADS”" message](docs/images/03-settings-connected.png)
+
+You can click **Test connection** any time to check again. Leave the **Outreach** card on the right as it is unless your team lead says otherwise.
+
+✅ **It worked if** the message says *Connected*, the pill at the top turns green and says **Active**, and a small pinned **LinkedIn Messaging** tab appears at the far left of your Chrome tabs.
+
+![The top bar with the green "Active" pill](docs/images/03-active-pill.png)
+
+---
+
+## Part 4 — Daily use
+
+Click the **ReplyTrack** icon to open the dashboard. The tabs at the top: **Overview** (today at a glance), **Outreach**, **Replies**, **To send** and **Settings**.
+
+### Outreach — send connection requests
+
+ReplyTrack only sends to rows where **Outreach Status** is empty or **Not Started** and both **LinkedIn Profile** and **Personalized Message** are filled in. It never touches rows with any other status, and never sends a second request to the same person.
+
+1. Click **Outreach**.
+2. Click **Dry run** first. It checks each waiting row on LinkedIn and tells you what would happen. It sends nothing and doesn't change your sheet.
+   ![Outreach tab after a dry run: the Dry run and Start buttons, today's numbers and "Dry run finished"](docs/images/04-outreach.png)
+3. Scroll down to the **Rows** table and read what would happen to each row. Click **Log** to see more details.
+   ![The Rows table and the Log after a dry run, saying what would happen to each row](docs/images/04-outreach-dry-run-log.png)
+4. Click **Start**. (The button shows how many rows are waiting.)
+5. Click **OK** to confirm.
+6. Leave it running. It works in a small minimized LinkedIn window, so you can close the dashboard. Keep Chrome open.
+7. To stop it, click the red **Stop** button. Next time the button says **Continue from row …**.
+
+✅ **It worked if** the card says *Sending 1 of …* and, in your sheet, the rows change to **Sent** with today's **Sent Date**.
+
+Good to know:
+
+- After **500** requests in a day it stops by itself, and a banner says *Daily invite limit reached — press Continue tomorrow*.
+- People you're already connected with don't get a request. They appear in **To send → Already connected**, so you can send them your message as a chat.
+- Twice a day ReplyTrack checks who accepted, and writes **Accepted but not replied** in their **Response / Notes**. To check right now, click **Check now** in the **Who accepted** card.
+
+### Replies — automatic
+
+Every 20 minutes, the pinned **LinkedIn Messaging** tab copies new replies into **Response / Notes**, with the date and time. The person's **Outreach Status** changes from **Sent** to **Replied**. Leave that pinned tab open.
+
+1. To check for replies right now, click **Replies**, then **Sync now**.
+2. To stop only the replies, click **Stop sync**. To turn them back on, click **Start sync**.
+
+![Replies tab: the next sync time, the last sync, replies today and the latest replies](docs/images/04-replies.png)
+
+✅ **It worked if** new replies appear under **Latest replies** and in your sheet.
+
+### To send — send replies yourself
+
+Nothing here is sent until you press **Send**. There are two kinds of items:
+
+- **Admin replies** — a reply your manager wrote for you in the main sheet.
+- **Already connected** — people you're already connected with; you can send them your Personalized Message as a chat.
+
+The number on the ReplyTrack icon shows how many are waiting.
+
+1. Click **To send**.
+2. Read their latest message.
+3. Change the text in the box if you want to.
+4. Click **Send**.
+5. Click **OK** when it asks *Send this message to …?*
+6. Wait a few seconds. ReplyTrack checks that you're connected, sends the message once, and checks that it arrived.
+
+![To send tab: one Admin reply with the person's latest message, and one Already connected item](docs/images/04-to-send.png)
+
+✅ **It worked if** the item disappears. For an admin reply, the **Admin Reply** and **Response / Notes** cells in that row are emptied. For an "Already connected" item, the row gets **Sent** and today's **Sent Date**.
+
+The other buttons:
+
+- **Skip** — hide this item. It comes back only if the text changes.
+- **Already sent by hand** — you already sent it yourself on LinkedIn. Nothing is sent; the row is updated as if it had been sent.
+
+If you see one of these messages:
+
+- **Not connected yet — LinkedIn only allows messages to connections** — they haven't accepted yet. **Send** stays grey.
+- **This message is already in the conversation** — click **Mark as sent**.
+- **Couldn't confirm — check the conversation on LinkedIn** — click **Open the conversation** and look. Then click **It was sent** or **It wasn't sent**. ReplyTrack never sends a message twice by itself.
+- **You already sent this exact message to …** — the same text can't be sent twice to the same person.
+
+### Pause everything
+
+Click **Pause everything** (top right) to stop outreach, replies and the "who accepted" check in one click. The pill turns grey and says **Paused**. Click **Start again** to turn back on what was running.
+
+The pill at the top tells you how things are:
+
+- 🟢 **Active** — everything is on.
+- 🟠 **Partly paused** — the replies are stopped, or outreach stopped part-way. Hold the mouse over the pill to see which.
+- ⚪ **Paused** — you pressed **Pause everything**.
+
+---
+
+## Part 5 — Make it start by itself
+
+ReplyTrack only works while Chrome is open. Set Chrome to open when your computer starts.
+
+#### Windows
+
+1. Press the **Windows key + R**, type `shell:startup` and press **Enter**. A folder opens.
+2. Find **Google Chrome** in the Start menu, right-click it and choose **Open file location**.
+3. Right-click **Google Chrome** and choose **Copy**.
+4. Go back to the startup folder, right-click an empty spot and choose **Paste shortcut**.
+
+#### Mac
+
+1. Click the Apple menu → **System Settings → General → Login Items**.
+2. Under **Open at Login**, click **+**, choose **Google Chrome** and click **Open**.
+
+#### In Chrome (Windows and Mac)
+
+1. Click Chrome's menu **⋮** → **Settings → On startup** → choose **Continue where you left off**. This brings the pinned LinkedIn tab back.
+2. Windows only: in **Settings → System**, turn on **Continue running background apps when Google Chrome is closed**.
+
+#### Every day
+
+- Keep the pinned **LinkedIn Messaging** tab open. If you close it, it comes back within 20 minutes.
+- Keep the computer on during work hours. The screen may turn off and you may lock the computer — only **sleep** stops ReplyTrack.
+
+✅ **It worked if**, after you restart your computer, Chrome opens by itself with the pinned LinkedIn tab, and the ReplyTrack pill says **Active**.
+
+---
+
+## Something's not working?
+
+### The pill says "Not set up"
+
+![The "Not set up yet" banner and the grey "Not set up" pill](docs/images/faq-not-set-up.png)
+
+ReplyTrack doesn't have your settings yet. Click **Open settings** on the banner and do [Part 3](#part-3--connect-it).
+
+### "LinkedIn logged out — sign in again"
+
+1. Click **Sign in** on the banner. LinkedIn's sign-in page opens.
+2. Sign in to LinkedIn.
+
+The banner goes away once you're signed in. If outreach had stopped, open **Outreach** and click **Continue from row …**.
+
+### Test connection shows a problem
+
+| The message says | What to do |
 |---|---|
-| `tab not found` | The tab name in Settings doesn't match the sheet. Fix the spelling. |
-| `missing column: …` | Row 1 of your tab doesn't have that header. Fix the sheet or `Code.gs`. |
-| `Apps Script returned a web page…` | The deployment isn't set to **Anyone**, the URL doesn't end in `/exec`, or the script has an error. |
-| `LinkedIn is logged out` | Sign in to LinkedIn in Chrome. |
-| `No internet connection — retrying in 1 minute` | Nothing to do. It tries again every minute until the connection is back. |
-| `Couldn't read any conversation — LinkedIn's layout may have changed` | Update the selectors (below). |
-| `The conversation list did not load` | Update `conversationList` / `conversationItem` (below). |
+| Your sheet has no tab called "…" | Check **Tab name** in Settings. It must match your tab exactly — spaces count. |
+| The secret key doesn't match SECRET_KEY in your Code.gs | Paste the same key in Settings and in Code.gs. If you changed it in Code.gs after deploying, deploy again ([Updating](#updating-to-a-new-version), steps 9–11). |
+| Your Code.gs isn't ready: set SECRET_KEY in Code.gs | You didn't replace **CHANGE-ME** yet. Do Part 1, step 8, save, then deploy again ([Updating](#updating-to-a-new-version), steps 9–11). |
+| … SECRET_KEY in Code.gs is too short | Use a key with 16 or more characters. |
+| Problem: missing column: … | Row 1 of your MY LEADS tab is missing that column name. Add it exactly as written. |
+| Problem: Apps Script returned a web page instead of an answer | In the deployment, **Who has access** must be **Anyone**, and the address must end in **/exec**. |
+| That's a test (/dev) URL | Use the address from **Deploy** that ends in **/exec**. |
+| Problem: could not reach Apps Script | Check your internet connection and try again. |
+| Problem: unexpected answer … is the NEW Code.gs deployed? | Your sheet still has an old script. Paste the new Code.gs and deploy again ([Updating](#updating-to-a-new-version), steps 6–11). |
+| ⚠ "Sent" isn't in the dropdown | Ask your team lead to add **Sent** (and **Replied**) to the Outreach Status dropdown. |
 
-**2. Read the detailed log.** In the pinned LinkedIn tab, press **F12** (Mac: **Cmd+Option+I**) → **Console** tab → type `[ReplySync]` in the filter box. Every step is logged: each conversation, what was sent, and what was skipped and why. For the background part: `chrome://extensions` → ReplyTrack → **"service worker"** link → Console.
+If a banner says **Can't reach your sheet — check settings**, check your internet, then click **Test connection** in Settings.
 
-**3. Update the selectors when LinkedIn changes its page.** All page-specific settings are in the **`CONFIG`** block at the top of `extension/content.js`. Each entry is a list of CSS selectors that are tried in order.
+### Replies don't appear in my sheet
 
-1. Open `linkedin.com/messaging` in a normal tab.
-2. Right-click the part that's no longer found, for example a conversation in the left list, the person's name above an open conversation, or one of their messages. Choose **Inspect**.
-3. In the panel that opens, look at the highlighted element for something **stable**, like a readable class (`msg-…`), an `aria-label`, a `data-…` attribute, or a link pattern (`href*="/in/"`). Avoid random-looking classes like `ember123` or `_a1b2c`.
-4. Test it: in the **Console** tab, run `document.querySelectorAll('YOUR SELECTOR').length`. It should match what you expect, e.g. one per conversation.
-5. Add it to the **front** of the right list in `CONFIG.SELECTORS`, and keep the old ones after it:
-   ```js
-   conversationItem: [
-       "li.new-linkedin-class",          // ← new one first
-       "li.msg-conversation-listitem",   // old ones stay as fallbacks
-       ...
-   ```
-6. Save the file. Go to `chrome://extensions` and click the **↻ reload** icon on ReplyTrack. Then click **Sync now**.
+Check these, in order:
 
-What each list is for:
+1. Open the **Replies** tab. If it says **Stopped**, click **Start sync**. If it says **Paused**, click **Start again** at the top.
+2. Make sure the pinned **LinkedIn Messaging** tab is open. Clicking **Sync now** opens it again.
+3. The person must be in your **MY LEADS** tab with the same LinkedIn Profile link. Replies from people who aren't in your sheet are not written.
+4. Group chats, sponsored messages and InMail are skipped.
+5. While outreach is running, replies wait and sync right after it finishes.
 
-| CONFIG entry | Finds |
-|---|---|
-| `conversationList`, `conversationItem` | the left-hand list and each conversation in it |
-| `clickTarget` | what gets clicked to open a conversation |
-| `itemName`, `itemTime` | name and "last activity" time on each conversation |
-| `threadTitleBar`, `threadProfileLink`, `threadName` | the bar at the top of an open conversation, with the person's profile link |
-| `messageList`, `messageEvent`, `messageItem`, `messageBody` | the messages and their text |
-| `otherPersonMessage`, `senderLink`, `senderName` | how to tell *their* messages from *yours* |
-| `dateHeading`, `messageTime` | when each message was sent: the date dividers ("Today", "Oct 12") and the time next to the sender's name. If these break, replies get the time they were *captured*, and the Console shows *"Couldn't read when … were sent"*. |
-| `itemSponsoredLabel`, `itemGroupMarker` | what gets skipped |
+### Google says "Sorry, unable to open the file at this time"
 
-After changing selectors, it's safe to use **Settings → Reset sync history** to re-check the last 50 conversations. Nothing already in the sheet gets duplicated.
+This happens when Chrome is signed in to several Google accounts at once.
+
+1. Open an Incognito window: press **Ctrl+Shift+N** (Mac: **Cmd+Shift+N**).
+2. Go to **sheets.google.com** and sign in with only the Google account that owns your sheet.
+3. Open your sheet, then click **Extensions → Apps Script** and continue with Part 1.
+
+You only need Incognito for setting up the script. Use ReplyTrack in your normal Chrome window.
 
 ---
 
-## Good to know
+## Updating to a new version
 
-- **Conversations get marked as read.** The extension opens conversations like you would, so LinkedIn marks them as read.
-- **A profile view may show up.** LinkedIn's messaging page often shows profile links as a code (`/in/ACoAA…`) instead of the person's name link. To turn the code into the real link, the extension opens that profile in the background, once per person (it remembers the result), so LinkedIn may count it as a profile view.
-- **Only rows in your tab are touched.** Replies from people who aren't in your tab are sent to the script, which ignores them (`profile not in tab`), and nothing is written. If you add that person to your tab later, their reply is filled in the next time they message you.
-- **Group chats and sponsored/InMail messages are skipped.**
-- **LinkedIn's rules:** LinkedIn's User Agreement restricts automated tools. This extension only reads your own inbox, slowly, while you're signed in. Still, using it is your team's decision and risk.
+1. Download the new ZIP from GitHub and extract it (Part 2, steps 1–2).
+2. Open your **existing** ReplyTrack folder — the one you loaded in Part 2 — and replace everything in it with the files from the new folder. Keep the folder in the same place, with the same name. (If it moves, Chrome treats it as a new extension and your settings and history are lost.)
+3. Go to `chrome://extensions`.
+4. On **ReplyTrack**, click the **↻** reload icon.
+   ![TODO screenshot: chrome://extensions with the ReplyTrack card and its reload icon highlighted](docs/images/TODO-chrome-extensions-reload.png)
+
+Your settings and history are kept. Never click **Remove** on ReplyTrack — that deletes its history (for example, who already got a request).
+
+Only if the update notes say **Code.gs changed**:
+
+5. Open your sheet and click **Extensions → Apps Script**.
+6. Replace all the code with the new Code.gs (Part 1, steps 3–6).
+7. Put your secret key back into the `SECRET_KEY` line — the same key as before (Part 1, step 8).
+8. Click **Save project** (💾).
+9. Click **Deploy → Manage deployments**.
+10. Click the ✏️ pencil, and under **Version** choose **New version**.
+11. Click **Deploy**.
+    ![TODO screenshot: "Manage deployments" with the pencil clicked and "Version: New version" selected](docs/images/TODO-manage-deployments-new-version.png)
+
+Your web app address stays the same, so you don't need to change anything in Settings.
+
+✅ **It worked if** the pill says **Active** and **Settings → Test connection** says *Connected*.
+
+---
+
+*For developers: how ReplyTrack works inside, the sheet rules, storage and the test checklist are in [DEVELOPER.md](DEVELOPER.md).*

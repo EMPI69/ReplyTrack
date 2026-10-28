@@ -1,9 +1,9 @@
 {
 	"manifest_version": 3,
 	"name": "ReplyTrack",
-	"version": "1.1.0",
-	"description": "Copies LinkedIn message replies into your team's Google Sheet automatically.",
-	"permissions": ["storage", "alarms", "notifications", "idle", "cookies"],
+	"version": "2.1.0",
+	"description": "Sends LinkedIn connection requests from your Google Sheet, copies replies back into it, and sends your manager's replies when you say so.",
+	"permissions": ["storage", "unlimitedStorage", "scripting", "webRequest", "alarms", "notifications", "idle", "cookies"],
 	"host_permissions": [
 		"https://www.linkedin.com/*",
 		"https://script.google.com/*",
@@ -20,20 +20,21 @@
 		}
 	],
 	"action": {
-		"default_popup": "popup.html",
-		"default_title": "ReplyTrack",
+		"default_title": "ReplyTrack — open the dashboard",
 		"default_icon": {
 			"16": "icons/icon16.png",
+			"32": "icons/icon32.png",
 			"48": "icons/icon48.png",
 			"128": "icons/icon128.png"
 		}
 	},
 	"options_ui": {
-		"page": "options.html",
+		"page": "dashboard.html",
 		"open_in_tab": true
 	},
 	"icons": {
 		"16": "icons/icon16.png",
+		"32": "icons/icon32.png",
 		"48": "icons/icon48.png",
 		"128": "icons/icon128.png"
 	}
